@@ -192,7 +192,7 @@ Rules:
 Diff:
 %s`, targetLang, diff)
 
-	reqBody := GeminiRequest{Contents: []Content{{Parts: []Part{{Text: prompt}}}}}}
+	reqBody := GeminiRequest{Contents: []Content{{Parts: []Part{{Text: prompt}}}}}
 	jsonData, _ := json.Marshal(reqBody)
 
 	// Sử dụng Smart Client
