@@ -3,16 +3,19 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // --- Constants ---
@@ -127,7 +130,44 @@ func gitPush() {
 	}
 }
 
-// --- AI Logic ---
+// --- Network & AI Logic ---
+
+// createSmartHTTPClient tự động dùng Google DNS nếu hệ thống không có /etc/resolv.conf (Termux)
+func createSmartHTTPClient() *http.Client {
+	useCustomDNS := false
+	if runtime.GOOS == "linux" || runtime.GOOS == "android" {
+		// Kiểm tra file cấu hình DNS chuẩn
+		if _, err := os.Stat("/etc/resolv.conf"); os.IsNotExist(err) {
+			useCustomDNS = true
+		}
+	}
+
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	if useCustomDNS {
+		dialer.Resolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: 10 * time.Second,
+				}
+				// Force dùng Google DNS
+				return d.DialContext(ctx, "udp", "8.8.8.8:53")
+			},
+		}
+	}
+
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext: dialer.DialContext,
+		},
+		Timeout: 60 * time.Second,
+	}
+}
+
 func generateCommitMessage(diff string, apiKey string, lang string) (string, error) {
 	modelName := "gemini-3-flash-preview"
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
@@ -152,10 +192,12 @@ Rules:
 Diff:
 %s`, targetLang, diff)
 
-	reqBody := GeminiRequest{Contents: []Content{{Parts: []Part{{Text: prompt}}}}}
+	reqBody := GeminiRequest{Contents: []Content{{Parts: []Part{{Text: prompt}}}}}}
 	jsonData, _ := json.Marshal(reqBody)
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	// Sử dụng Smart Client
+	client := createSmartHTTPClient()
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
 	}
@@ -180,7 +222,6 @@ func main() {
 	defLangPtr := flag.String("def-lang", "", "Set default language")
 	langPtr := flag.String("lang", "", "Temporary language")
 	
-	// Pre-parse for add-api command
 	if len(os.Args) > 1 && os.Args[1] == "add-api" {
 		if len(os.Args) < 3 {
 			printError("Usage: gcommit add-api \"YOUR_KEY\"")
@@ -196,7 +237,6 @@ func main() {
 	flag.Parse()
 	config := loadConfig()
 
-	// Set Default Language
 	if *defLangPtr != "" {
 		config.Language = *defLangPtr
 		saveConfig(config)
@@ -214,7 +254,6 @@ func main() {
 		apiKey = os.Getenv("API_KEY")
 	}
 
-	// Interactive API Key Setup
 	if apiKey == "" {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Printf("\n%s%s⚠️  API Key missing!%s\n", ColorYellow, ColorBold, ColorReset)
@@ -229,7 +268,6 @@ func main() {
 		saveConfig(config)
 	}
 
-	// Git Logic
 	diff, err := getGitDiff()
 	if err != nil {
 		printError("No staged changes. Use 'git add' first.")
