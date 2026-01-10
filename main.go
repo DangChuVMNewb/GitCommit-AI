@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/dangchuvmnewb/gitcommit-ai/pkg/ai"
@@ -75,17 +76,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("\n%s\n", message)
+	ui.Info(fmt.Sprintf("\n%s", message))
 	fmt.Printf("\n[Y] Commit, [P] Push, [N] Quit: ")
-	
-	reader := bufio.NewReader(os.Stdin)
-	choice, _ := reader.ReadString('\n')
-	choice = strings.ToLower(strings.TrimSpace(choice))
+
+	// Disable input buffering and echoing to read single key
+	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+	exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+
+	var b = make([]byte, 1)
+	os.Stdin.Read(b)
+	choice := strings.ToLower(string(b))
+
+	// Restore terminal mode
+	exec.Command("stty", "-F", "/dev/tty", "sane").Run()
+	fmt.Println() // Add newline after input
 
 	if choice == "y" {
+		git.StageAll()
 		git.Commit(message)
 		ui.Success("Committed!")
 	} else if choice == "p" {
+		git.StageAll()
 		git.Commit(message)
 		git.Push()
 		ui.Success("Pushed!")

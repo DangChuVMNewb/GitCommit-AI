@@ -24,3 +24,7 @@ func Success(msg string) {
 func Error(msg string) {
 	fmt.Printf("%s✖ %s%s\n", ColorRed, msg, ColorReset)
 }
+
+func Info(msg string) {
+	fmt.Printf("%s%s\n%s", ColorCyan, msg, ColorReset)
+}

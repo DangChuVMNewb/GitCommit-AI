@@ -8,16 +8,25 @@ import (
 )
 
 func GetDiff() (string, error) {
-	cmd := exec.Command("git", "diff", "--cached")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
+	// Get staged changes
+	stagedCmd := exec.Command("git", "diff", "--cached")
+	stagedOut, _ := stagedCmd.CombinedOutput()
+
+	// Get unstaged changes (tracked files)
+	unstagedCmd := exec.Command("git", "diff")
+	unstagedOut, _ := unstagedCmd.CombinedOutput()
+
+	// Combine them
+	fullDiff := string(stagedOut) + "\n" + string(unstagedOut)
+
+	if strings.TrimSpace(fullDiff) == "" {
+		return "", fmt.Errorf("no changes found (stage files or modify tracked files)")
 	}
-	diff := string(out)
-	if strings.TrimSpace(diff) == "" {
-		return "", fmt.Errorf("no staged changes")
-	}
-	return diff, nil
+	return fullDiff, nil
+}
+
+func StageAll() error {
+	return exec.Command("git", "add", ".").Run()
 }
 
 func Commit(message string) error {

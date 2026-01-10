@@ -67,15 +67,15 @@ func GenerateMessage(diff string, apiKey string, lang string) (string, error) {
 	modelName := "gemini-3-flash-preview"
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
 
-	prompt := fmt.Sprintf(`You are an expert developer. Generate a professional git commit message in %s.
+	prompt := fmt.Sprintf(`You are an expert developer. Generate a professional git commit message strictly in %s language.
 Rules:
 1. Header: <emoji> <type>: <summary>
 2. Body: Paragraph context + Bullet points.
 3. List affected files.
-4. ONLY raw text.
+4. Output MUST be in %s.
 
 Diff:
-%s`, lang, diff)
+%s`, lang, lang, diff)
 
 	reqBody := GeminiRequest{Contents: []Content{{Parts: []Part{{Text: prompt}}}}}
 	jsonData, _ := json.Marshal(reqBody)
