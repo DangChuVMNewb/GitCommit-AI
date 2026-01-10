@@ -70,13 +70,51 @@ func main() {
 	}
 
 	ui.Step(fmt.Sprintf("Generating Pro Message (Lang: %s)...", effectiveLang))
-	message, err := ai.GenerateMessage(diff, apiKey, effectiveLang)
+	aiMessage, err := ai.GenerateMessage(diff, apiKey, effectiveLang)
 	if err != nil {
 		ui.Error(err.Error())
 		os.Exit(1)
 	}
 
-	ui.Info(fmt.Sprintf("\n%s", message))
+	// Process files for GitHub-style display
+	files, _ := git.GetStatus()
+	var fileListDisplay strings.Builder
+	var fileListPlain strings.Builder
+
+	header := "Files changed:"
+	if strings.Contains(strings.ToLower(effectiveLang), "vi") {
+		header = "Các tập tin đã thay đổi:"
+	}
+
+	fileListDisplay.WriteString("\n" + ui.ColorYellow + header + ui.ColorReset + "\n")
+	fileListPlain.WriteString("\n" + header + "\n")
+
+	for _, f := range files {
+		// git status --porcelain returns "XY filename"
+		// X is staged, Y is unstaged. If either is 'D', it's a deletion logic usually,
+		// but simplified: D at start means deleted.
+		code := f[:2]
+		name := f[3:]
+		
+		var lineDisplay, linePlain string
+		if strings.Contains(code, "D") {
+			// Deleted
+			lineDisplay = fmt.Sprintf("%s- %s%s", ui.ColorRed, name, ui.ColorReset)
+			linePlain = fmt.Sprintf("- %s", name)
+		} else {
+			// Added / Modified / Renamed
+			lineDisplay = fmt.Sprintf("%s+ %s%s", ui.ColorGreen, name, ui.ColorReset)
+			linePlain = fmt.Sprintf("+ %s", name)
+		}
+		
+		fileListDisplay.WriteString(lineDisplay + "\n")
+		fileListPlain.WriteString(linePlain + "\n")
+	}
+
+	fullDisplayMsg := aiMessage + "\n" + fileListDisplay.String()
+	finalCommitMsg := aiMessage + "\n" + fileListPlain.String()
+
+	ui.Info(fmt.Sprintf("\n%s", fullDisplayMsg))
 	fmt.Printf("\n[Y] Commit, [P] Push, [N] Quit: ")
 
 	// Disable input buffering and echoing to read single key
@@ -93,11 +131,11 @@ func main() {
 
 	if choice == "y" {
 		git.StageAll()
-		git.Commit(message)
+		git.Commit(finalCommitMsg)
 		ui.Success("Committed!")
 	} else if choice == "p" {
 		git.StageAll()
-		git.Commit(message)
+		git.Commit(finalCommitMsg)
 		git.Push()
 		ui.Success("Pushed!")
 	}

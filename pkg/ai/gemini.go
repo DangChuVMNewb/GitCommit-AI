@@ -71,11 +71,11 @@ func GenerateMessage(diff string, apiKey string, lang string) (string, error) {
 Rules:
 1. Header: <emoji> <type>: <summary>
 2. Body: Paragraph context + Bullet points.
-3. List changed files with the header "Files changed:" (translated to %s).
+3. DO NOT list affected files. I will append them programmatically.
 4. Output MUST be in %s.
 
 Diff:
-%s`, lang, lang, lang, diff)
+%s`, lang, lang, diff)
 
 	reqBody := GeminiRequest{Contents: []Content{{Parts: []Part{{Text: prompt}}}}}
 	jsonData, _ := json.Marshal(reqBody)

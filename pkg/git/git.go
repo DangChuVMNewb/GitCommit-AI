@@ -25,6 +25,22 @@ func GetDiff() (string, error) {
 	return fullDiff, nil
 }
 
+func GetStatus() ([]string, error) {
+	cmd := exec.Command("git", "status", "--porcelain")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var result []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			result = append(result, line)
+		}
+	}
+	return result, nil
+}
+
 func StageAll() error {
 	return exec.Command("git", "add", ".").Run()
 }
