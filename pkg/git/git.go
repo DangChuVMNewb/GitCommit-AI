@@ -16,11 +16,27 @@ func GetDiff() (string, error) {
 	unstagedCmd := exec.Command("git", "diff")
 	unstagedOut, _ := unstagedCmd.CombinedOutput()
 
-	// Combine them
 	fullDiff := string(stagedOut) + "\n" + string(unstagedOut)
 
+	// Get Untracked files (New files)
+	untrackedCmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
+	untrackedOut, _ := untrackedCmd.CombinedOutput()
+	untrackedFiles := strings.Split(strings.TrimSpace(string(untrackedOut)), "\n")
+
+	for _, file := range untrackedFiles {
+		if file == "" {
+			continue
+		}
+		// Read content of untracked file to give context to AI
+		content, err := os.ReadFile(file)
+		if err == nil {
+			// Format like a git diff for new file
+			fullDiff += fmt.Sprintf("\ndiff --git a/%s b/%s\nnew file mode 100644\n--- /dev/null\n+++ b/%s\n@@ -0,0 +1 @@\n%s\n", file, file, file, string(content))
+		}
+	}
+
 	if strings.TrimSpace(fullDiff) == "" {
-		return "", fmt.Errorf("no changes found (stage files or modify tracked files)")
+		return "", fmt.Errorf("no changes found (stage files, modify tracked files, or create new files)")
 	}
 	return fullDiff, nil
 }
